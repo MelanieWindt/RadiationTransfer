@@ -4,10 +4,12 @@
 #include "meshProcessor/mesh.h"
 
 struct faceSolut {
-	double a;
+	mesh3d::vector a;
+	double b;
 
-	double operator () (const mesh3d::vector &point) {
-		return a;
+
+	double evaluate (const mesh3d::vector &point) {
+		return a.dot(point) + b;
 	}
 
 };

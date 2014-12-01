@@ -9,6 +9,7 @@
 #include "LebedevQuad.h"
 #include "faceSolut.h"
 #include "traceInfo.h"
+#include "matrixSolution.h"
 
 using namespace mesh3d;
 
@@ -71,6 +72,22 @@ double Ieq_by_color (index color) {
 	return 0;
 }
 
+double &getElem (double A[16], int i, int j) {
+	return A[i*4 + j];
+}
+
+void solveEq(const vector points[4], double v[4]) {
+	double A [16];
+	for (int i = 0; i < 4; i++) {
+		getElem (A, i, 0) = points[i].x;
+		getElem (A, i, 1) = points[i].y;
+		getElem (A, i, 2) = points[i].z;
+		getElem (A, i, 3) = 1;
+	}
+
+	solve (4, A, v, v);
+}
+
 void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_sol) {
 
 	std::cout << "Processing direction " << omega << std::endl;
@@ -127,33 +144,54 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 			const tetrahedron &tet = m.tets(tetNum);
 			one_dir_sol[tetNum] = 0;
 			for (int k = 0; k < 4; k++) {
-				if (!cr.isOuter(tet.f(k))) {
-					const face &flipped = tet.f(k).flip();
-					if (flipped.is_border()) {
-						solution[tetNum][k].a = 0;
-					}
-					else {
-						int flipTetNum = flipped.tet().idx();
-						int faceNum = flipped.face_local_index();
-						solution[tetNum][k] = solution[flipTetNum][faceNum];
-					}
+				if (cr.isOuter(tet.f(k)))
+					continue;
+				const face &flipped = tet.f(k).flip();
+				if (flipped.is_border()) {
+					solution[tetNum][k].b = 0;
+					solution[tetNum][k].a = vector (0);
+				}
+				else {
+					int flipTetNum = flipped.tet().idx();
+					int faceNum = flipped.face_local_index();
+					solution[tetNum][k] = solution[flipTetNum][faceNum];
 				}
 			}
 			for (int k = 0; k < 4; k++) {
-				vector p = tet.f(k).center();
-				if (cr.isOuter(tet.f(k))) {
+				if (!cr.isOuter(tet.f(k)))
+					continue;
+
+				vector points [4];
+				double v[4];
+				points[3] = tet.center();
+				v[3] = 0;
+
+				vector sum = (tet.f(k).p(0).r() + tet.f(k).p(1).r() + tet.f(k).p(2).r())*(1.0/6);
+
+				for (int iter = 0; iter < 3; iter++) {
+					points[iter] = tet.f(k).p(iter).r()*0.5 + sum;
+				}
+
+				for(int iter = 0; iter < 3; iter ++){
+					const vector &p = points[iter];
+
 					traceInfo qInfo = traceTet(tet, omega, p, cr);
-					double solutQ = solution[tetNum][qInfo.num](qInfo.point);
+					double solutQ = solution[tetNum][qInfo.num].evaluate(qInfo.point);
 
 					double delta = norm(p - qInfo.point);
 					double eKappeDelta = exp(-kappa_by_color(tet.color())*delta);
 					double Ieq = Ieq_by_color(tet.color());
 					double solutP = solutQ*eKappeDelta + Ieq*(1 - eKappeDelta);
+					v[iter] = solutP;
 
-					solution[tetNum][k].a = solutP;
 				}
+				solveEq (points, v);
+				solution[tetNum][k].b = v[3];
+				solution[tetNum][k].a = vector(v[0], v[1], v[2]);
+			}
 
-				one_dir_sol[tetNum] += 0.25*solution[tetNum][k](p);
+			for (int k = 0; k < 4; k++) {
+				one_dir_sol[tetNum] += 0.25*solution[tetNum][k].evaluate(tet.f(k).center());
 			}	
 		}
 	}
@@ -167,7 +205,7 @@ int main() {
 		bool res = m.check(&std::cout);
 		std::cout << "Mesh check: " << (res ? "OK" : "failed") << std::endl;
 		
-		LebedevQuad quad(20);
+		LebedevQuad quad(0);
 
 		std::cout << "Using " << quad.order << " directions" << std::endl;
 		std::vector<double> U(m.tets().size(), 0);
