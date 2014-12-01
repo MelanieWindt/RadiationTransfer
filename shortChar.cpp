@@ -148,8 +148,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 					continue;
 				const face &flipped = tet.f(k).flip();
 				if (flipped.is_border()) {
-					solution[tetNum][k].b = 0;
-					solution[tetNum][k].a = vector (0);
+					solution[tetNum][k].setZero();
 				}
 				else {
 					int flipTetNum = flipped.tet().idx();

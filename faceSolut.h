@@ -12,6 +12,12 @@ struct faceSolut {
 		return a.dot(point) + b;
 	}
 
+	void setZero () {
+		b = 0;
+		a = mesh3d::vector(0);
+	}
+
 };
+
 
 #endif
