@@ -72,20 +72,37 @@ double Ieq_by_color (index color) {
 	return 0;
 }
 
-double &getElem (double A[16], int i, int j) {
-	return A[i*4 + j];
-}
-
-void solveEq(const vector points[4], double v[4]) {
-	double A [16];
-	for (int i = 0; i < 4; i++) {
-		getElem (A, i, 0) = points[i].x;
-		getElem (A, i, 1) = points[i].y;
-		getElem (A, i, 2) = points[i].z;
-		getElem (A, i, 3) = 1;
+void solveEq(const vector points[7], double v[10]) {
+	double A [10][10] = {0};
+	double w [10], B[10][10];
+	for (int i = 0; i < 7; i++) {
+		double x1 = points[i].x;
+		double x2 = points[i].y;
+		double x3 = points[i].z;
+		A[i][0] = 0.5*x1*x1;
+		A[i][1] = 0.5*x2*x2;
+		A[i][2] = 0.5*x3*x3;
+		A[i][3] = x2*x3;
+		A[i][4] = x1*x3;
+		A[i][5] = x2*x1;
+		A[i][6] = x1;
+		A[i][7] = x2;
+		A[i][8] = x3;
+		A[i][9] = 1;
 	}
 
-	solve (4, A, v, v);
+	A[7][0] = A[8][5] = A[9][4] = points[6].x;
+	A[7][5] = A[8][1] = A[9][3] = points[6].y;
+	A[7][4] = A[8][3] = A[9][2] = points[6].z;
+
+	A[7][6] = A[8][7] = A[9][8] = 1;
+
+	for (int i = 0; i < 10; i++) {
+		for (int j = 0; j < 10; j++)
+			B[i][j] = A[i][j];
+		w[i] = v[i];
+	}
+	solve (10, (double *)A, v, v);
 }
 
 void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_sol) {
@@ -160,16 +177,21 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 				if (!cr.isOuter(tet.f(k)))
 					continue;
 
-				vector points [4];
-				double v[4];
-				points[3] = tet.center();
-				v[3] = 0;
+				vector points [7];
+				double v[10];
+				v[6] = v[7] = v[8] = v[9] = 0;
 
 				for (int i = 0; i < 3; i++) {
 					points[i] = tet.f(k).p(i).r();
 				}
 
-				for(int i = 0; i < 3; i++){
+				points [3] = 0.5*(points[0]+points[1]);
+				points [4] = 0.5*(points[1]+points[2]);
+				points [5] = 0.5*(points[0]+points[2]);
+				points [6] = tet.center();
+
+
+				for(int i = 0; i < 6; i++){
 					const vector &p = points[i];
 
 					traceInfo qInfo = traceTet(tet, omega, p, cr);
@@ -183,13 +205,12 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 
 				}
 				solveEq (points, v);
-				solution[tetNum][k].b = v[3];
-				solution[tetNum][k].a = vector(v[0], v[1], v[2]);
+				solution[tetNum][k].set(v);
 			}
 
 			for (int k = 0; k < 4; k++) {
 				one_dir_sol[tetNum] += 0.25*solution[tetNum][k].evaluate(tet.f(k).center());
-			}	
+			}
 		}
 	}
 }
@@ -212,6 +233,12 @@ int main() {
 			one_dir(m, vector(quad.x[s], quad.y[s], quad.z[s]), I);
 			for (int i = 0; i < m.tets().size(); i++)
 				U[i] += quad.w[s] * I[i];
+			if (s == 0) {
+				vtk_stream vtk("onedir.vtk");
+				vtk.write_header(m, "I_1");
+				vtk.append_cell_data(I.data(), "I");
+				vtk.close(); 
+			}
 		}
 
 		vtk_stream vtk("mesh.vtk");

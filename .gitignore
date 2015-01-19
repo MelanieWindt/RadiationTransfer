@@ -1,4 +1,4 @@
 meshProcessor
-build
+build*
 *.ini
 *.vol
