@@ -100,7 +100,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 		const tetrahedron &tet = m.tets(i);
 
 		for (int j = 0; j < 4; j++) {
-			const face & f= tet.f(j);
+			const face & f = tet.f(j);
 			const face & flipped = f.flip();
 			if (flipped.is_border())
 				continue;
@@ -138,9 +138,9 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 
 	std::vector<std::vector<faceSolut> > solution(m.tets().size(), std::vector<faceSolut>(4));
 
-	for (int i=0; i < maxColor+1; i++){
-		for(int j = 0; j < order[i].size(); j++){
-			int tetNum = order[i][j];
+	for (int color=0; color < maxColor+1; color++){
+		for(int j = 0; j < order[color].size(); j++){
+			int tetNum = order[color][j];
 			const tetrahedron &tet = m.tets(tetNum);
 			one_dir_sol[tetNum] = 0;
 			for (int k = 0; k < 4; k++) {
@@ -165,14 +165,12 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 				points[3] = tet.center();
 				v[3] = 0;
 
-				vector sum = (tet.f(k).p(0).r() + tet.f(k).p(1).r() + tet.f(k).p(2).r())*(1.0/6);
-
-				for (int iter = 0; iter < 3; iter++) {
-					points[iter] = tet.f(k).p(iter).r()*0.5 + sum;
+				for (int i = 0; i < 3; i++) {
+					points[i] = tet.f(k).p(i).r();
 				}
 
-				for(int iter = 0; iter < 3; iter ++){
-					const vector &p = points[iter];
+				for(int i = 0; i < 3; i++){
+					const vector &p = points[i];
 
 					traceInfo qInfo = traceTet(tet, omega, p, cr);
 					double solutQ = solution[tetNum][qInfo.num].evaluate(qInfo.point);
@@ -181,7 +179,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 					double eKappeDelta = exp(-kappa_by_color(tet.color())*delta);
 					double Ieq = Ieq_by_color(tet.color());
 					double solutP = solutQ*eKappeDelta + Ieq*(1 - eKappeDelta);
-					v[iter] = solutP;
+					v[i] = solutP;
 
 				}
 				solveEq (points, v);
@@ -204,7 +202,7 @@ int main() {
 		bool res = m.check(&std::cout);
 		std::cout << "Mesh check: " << (res ? "OK" : "failed") << std::endl;
 		
-		LebedevQuad quad(0);
+		LebedevQuad quad(5);
 
 		std::cout << "Using " << quad.order << " directions" << std::endl;
 		std::vector<double> U(m.tets().size(), 0);
