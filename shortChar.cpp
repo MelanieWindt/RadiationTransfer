@@ -105,6 +105,24 @@ void solveEq(const vector points[7], double v[10]) {
 	solve (10, (double *)A, v, v);
 }
 
+double correctValue(double solutP, double I1, double I2) {
+	double min, max;
+	if (I1 > I2) {
+		max = I1;
+		min = I2;
+	}
+	else {
+		max = I2;
+		min = I1;
+	}
+
+	if (solutP < min) 
+		return min;
+	if (solutP > max)
+		return max;
+
+}
+
 void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_sol) {
 
 	std::cout << "Processing direction " << omega << std::endl;
@@ -201,6 +219,32 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 					double eKappeDelta = exp(-kappa_by_color(tet.color())*delta);
 					double Ieq = Ieq_by_color(tet.color());
 					double solutP = solutQ*eKappeDelta + Ieq*(1 - eKappeDelta);
+
+					if (i == 3 || i == 4 || i == 5 ) {
+						int idx1, idx2;
+						double I1, I2;
+
+						if (i == 3) {
+							idx1 = 0;
+							idx2 = 1;
+						}
+
+						if (i == 4) {
+							idx1 = 1;
+							idx2 = 2;
+						}
+
+						if (i == 5) {
+							idx1 = 0;
+							idx2 = 2;
+						}
+						I1 = v[idx1];
+						I2 = v[idx2];
+						if (abs(solutP - 0.5*(I1 + I2)) > 0.25*(I1 - I2)) {
+							solutP = correctValue(solutP, I1, I2);
+						}
+					}
+
 					v[i] = solutP;
 
 				}
