@@ -108,12 +108,12 @@ void solveEq(const vector points[7], double v[10]) {
 double correctValue(double solutP, double I1, double I2) {
 	double min, max;
 	if (I1 > I2) {
-		max = I1;
-		min = I2;
+		max = 0.25*(3*I1 + I2);
+		min = 0.25*(3*I2 + I1);
 	}
 	else {
-		max = I2;
-		min = I1;
+		max = 0.25*(3*I2 + I1);
+		min = 0.25*(3*I1 + I2);
 	}
 
 	if (solutP < min) 
@@ -220,34 +220,37 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 					double Ieq = Ieq_by_color(tet.color());
 					double solutP = solutQ*eKappeDelta + Ieq*(1 - eKappeDelta);
 
-					if (i == 3 || i == 4 || i == 5 ) {
-						int idx1, idx2;
-						double I1, I2;
-
-						if (i == 3) {
-							idx1 = 0;
-							idx2 = 1;
-						}
-
-						if (i == 4) {
-							idx1 = 1;
-							idx2 = 2;
-						}
-
-						if (i == 5) {
-							idx1 = 0;
-							idx2 = 2;
-						}
-						I1 = v[idx1];
-						I2 = v[idx2];
-						if (abs(solutP - 0.5*(I1 + I2)) > 0.25*(I1 - I2)) {
-							solutP = correctValue(solutP, I1, I2);
-						}
-					}
-
 					v[i] = solutP;
 
 				}
+
+				for (int i = 3; i < 6; i++) {
+
+					int idx1, idx2;
+					double I1, I2;
+
+					if (i == 3) {
+						idx1 = 0;
+						idx2 = 1;
+					} 
+
+					else if (i == 4) {
+						idx1 = 1;
+						idx2 = 2;
+					}
+
+					else if (i == 5) {
+						idx1 = 0;
+						idx2 = 2;
+					}
+					I1 = v[idx1];
+					I2 = v[idx2];
+
+					if (abs(v[i] - 0.5*(I1 + I2)) > 0.25*abs(I1 - I2)) {
+						v[i] = correctValue(v[i], I1, I2);
+					}
+				}
+
 				solveEq (points, v);
 				solution[tetNum][k].set(v);
 			}
