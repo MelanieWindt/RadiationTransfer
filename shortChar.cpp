@@ -118,8 +118,10 @@ double correctValue(double solutP, double I1, double I2) {
 
 	if (solutP < min) 
 		return min;
-	if (solutP > max)
+	else if (solutP > max)
 		return max;
+	else 
+		return solutP;
 
 }
 
@@ -224,32 +226,9 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 
 				}
 
-				for (int i = 3; i < 6; i++) {
-
-					int idx1, idx2;
-					double I1, I2;
-
-					if (i == 3) {
-						idx1 = 0;
-						idx2 = 1;
-					} 
-
-					else if (i == 4) {
-						idx1 = 1;
-						idx2 = 2;
-					}
-
-					else if (i == 5) {
-						idx1 = 0;
-						idx2 = 2;
-					}
-					I1 = v[idx1];
-					I2 = v[idx2];
-
-					if (abs(v[i] - 0.5*(I1 + I2)) > 0.25*abs(I1 - I2)) {
-						v[i] = correctValue(v[i], I1, I2);
-					}
-				}
+				v[3] = correctValue(v[3], v[0], v[1]);
+				v[4] = correctValue(v[4], v[1], v[2]);
+				v[5] = correctValue(v[5], v[0], v[2]);
 
 				solveEq (points, v);
 				solution[tetNum][k].set(v);
