@@ -10,6 +10,7 @@
 #include "faceSolut.h"
 #include "traceInfo.h"
 #include "matrixSolution.h"
+#include "timer.h"
 
 using namespace mesh3d;
 
@@ -255,6 +256,8 @@ int main() {
 		std::vector<double> U(m.tets().size(), 0);
 		std::vector<double> I(m.tets().size());
 
+		Timer :: getDelta("cycle start");
+
 		for (int s = 0; s < quad.order; s++) {
 			one_dir(m, vector(quad.x[s], quad.y[s], quad.z[s]), I);
 			for (int i = 0; i < m.tets().size(); i++)
@@ -266,7 +269,8 @@ int main() {
 				vtk.close(); 
 			}
 		}
-
+		Timer :: getDelta ("cycle end");
+		
 		vtk_stream vtk("mesh.vtk");
 		vtk.write_header(m, "U");
 		vtk.append_cell_data(U.data(), "U");
