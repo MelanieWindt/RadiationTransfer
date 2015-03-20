@@ -36,7 +36,6 @@ double traceFromPoint(const face &f, const vector &omega, vector initPoint, vect
 }
 
 traceInfo traceTet (const tetrahedron &tet, const vector &omega, const vector &initPoint, const OuterCrit &cr) {
-	double ls[4];
 	double sigma[4];
 	vector Qs[4];
 
@@ -45,7 +44,7 @@ traceInfo traceTet (const tetrahedron &tet, const vector &omega, const vector &i
 			sigma[i] = 2;
 			continue;
 		}
-		ls[i] = traceFromPoint(tet.f(i), omega, initPoint, Qs[i]);
+		traceFromPoint(tet.f(i), omega, initPoint, Qs[i]);
 		sigma[i] = containTest(tet.f(i), Qs[i]);
 	}
 
@@ -75,7 +74,6 @@ double Ieq_by_color (index color) {
 
 void solveEq(const vector points[7], double v[10]) {
 	double A [10][10] = {0};
-	double w [10], B[10][10];
 	for (int i = 0; i < 7; i++) {
 		double x1 = points[i].x;
 		double x2 = points[i].y;
@@ -97,12 +95,6 @@ void solveEq(const vector points[7], double v[10]) {
 	A[7][4] = A[8][3] = A[9][2] = points[6].z;
 
 	A[7][6] = A[8][7] = A[9][8] = 1;
-
-	for (int i = 0; i < 10; i++) {
-		for (int j = 0; j < 10; j++)
-			B[i][j] = A[i][j];
-		w[i] = v[i];
-	}
 	solve (10, (double *)A, v, v);
 }
 
@@ -134,32 +126,6 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 
 	OuterCrit cr (omega);
 
-	std::vector<std::vector<int> > g (m.tets().size()); 
-
-	for (int i = 0; i < m.tets().size(); i++) {
-		const tetrahedron &tet = m.tets(i);
-
-		for (int j = 0; j < 4; j++) {
-			const face & f = tet.f(j);
-			const face & flipped = f.flip();
-			if (flipped.is_border())
-				continue;
-			if (cr.isOuter(f)) {
-				g[i].push_back(flipped.tet().idx());
-			}
-		}
-	}
-
-	std::vector<int> cl (m.tets().size(), 0);
-	for (int i = 0; i < m.tets().size(); i++) {
-		if (dfs(i, g, cl)) {
-			std::cout << "Cycle found" << std::endl;
-			exit(1);
-		}
-	}
-
-	std::cout << "Cycles not found" << std::endl;
-
 	std::vector<int> colors;
 
 	Timer d;
@@ -169,7 +135,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 	std::cout << "one_dir function, painting graph " << d.stopAndGetElapsedTime () << std::endl;
 
 	int maxColor = 0;
-	for (int i = 0; i < colors.size() ; i++) {
+	for (size_t i = 0; i < colors.size() ; i++) {
 		if (colors[i] > maxColor ) { 
 			maxColor = colors[i];
 		}
@@ -177,7 +143,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 
 	std::vector<std::vector<int> > order(maxColor+1);
 
-	for (int i = 0; i < colors.size(); i++) {
+	for (size_t i = 0; i < colors.size(); i++) {
 		order[colors[i]].push_back(i);
 	}
 
@@ -186,7 +152,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 	Timer b;
 
 	for (int color=0; color < maxColor+1; color++){
-		for(int j = 0; j < order[color].size(); j++){
+		for(size_t j = 0; j < order[color].size(); j++){
 			int tetNum = order[color][j];
 			const tetrahedron &tet = m.tets(tetNum);
 			one_dir_sol[tetNum] = 0;
@@ -220,7 +186,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 				points [5] = 0.5*(points[0]+points[2]);
 				points [6] = tet.center();
 
-				//Timer a; 
+				 
 				for(int i = 0; i < 6; i++){
 					const vector &p = points[i];
 
@@ -235,7 +201,6 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 					v[i] = solutP;
 
 				}
-				//std::cout << "one_dir function, solut by points " << a.stopAndGetElapsedTime () << std::endl;
 
 				v[3] = correctValue(v[3], v[0], v[1]);
 				v[4] = correctValue(v[4], v[1], v[2]);
@@ -251,6 +216,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 		}
 	}
 	std::cout << "one_dir function, cycle by colors " << b.stopAndGetElapsedTime () << std::endl;
+	std::cout << "steps = " << maxColor + 1 << std::endl;
 	std::cout << "one_dir function " << t.stopAndGetElapsedTime () << std::endl;
 }
 
@@ -270,7 +236,7 @@ int main() {
 
 		for (int s = 0; s < quad.order; s++) {
 			one_dir(m, vector(quad.x[s], quad.y[s], quad.z[s]), I);
-			for (int i = 0; i < m.tets().size(); i++)
+			for (size_t i = 0; i < m.tets().size(); i++)
 				U[i] += quad.w[s] * I[i];
 			if (s == 0) {
 				vtk_stream vtk("onedir.vtk");

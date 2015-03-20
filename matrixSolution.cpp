@@ -5,7 +5,7 @@
 
 void solve(const int n, double a[], double b[], double x[]) {
     for (int k = 0; k < n; k++) {
-        int ks;
+        int ks = 0;
         double piv = 0;
         for (int i = k, ik = k * n + k; i < n; i++, ik += n)
             if (fabs(a[ik]) > piv) {
