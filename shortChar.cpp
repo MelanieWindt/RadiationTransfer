@@ -73,7 +73,12 @@ double Ieq_by_color (index color) {
 }
 
 void solveEq(const vector points[7], double v[10]) {
-	double A [10][10] = {0};
+	double A [10][10];
+	for (int i = 0; i < 10; i++) {
+		for (int j = 0; j < 10; j++) {
+			A[i][j] = 0;
+		}
+	}
 	for (int i = 0; i < 7; i++) {
 		double x1 = points[i].x;
 		double x2 = points[i].y;
@@ -222,14 +227,14 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 
 int main() {
 	try {
-		vol_mesh vm("../mesh.vol");
+		vol_mesh vm("../newMesh3mln.vol");
+		std::cout << "opening mesh" << std::endl;
 
 		mesh m(vm);
 		bool res = m.check(&std::cout);
 		std::cout << "Mesh check: " << (res ? "OK" : "failed") << std::endl;
 		
 		LebedevQuad quad(5);
-
 		std::cout << "Using " << quad.order << " directions" << std::endl;
 		std::vector<double> U(m.tets().size(), 0);
 		std::vector<double> I(m.tets().size());
