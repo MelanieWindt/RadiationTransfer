@@ -61,7 +61,7 @@ traceInfo traceTet (const tetrahedron &tet, const vector &omega, const vector &i
 }
 
 double kappa_by_color (index color) {
-	if (color ==1)
+	if (color == 1)
 		return 10;
 	return 0.01;
 }
@@ -156,7 +156,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 
 	Timer b;
 
-	for (int color=0; color < maxColor+1; color++){
+	for (int color = 0; color < maxColor+1; color++){
 		for(size_t j = 0; j < order[color].size(); j++){
 			int tetNum = order[color][j];
 			const tetrahedron &tet = m.tets(tetNum);
@@ -171,32 +171,53 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 				else {
 					int flipTetNum = flipped.tet().idx();
 					int faceNum = flipped.face_local_index();
-					solution[tetNum][k] = solution[flipTetNum][faceNum];
+
+					vector pointsOrig [3];
+					vector pointsFlip [6];
+
+					for (int bar = 0; bar < 3; bar ++) {
+						pointsOrig [bar] = tet.f(k).p(bar).r();
+						pointsFlip [bar] = tet.f(k).flip().p(bar).r();
+					}
+
+					pointsFlip [5] = 0.5*(pointsFlip[0]+pointsFlip[1]);
+					pointsFlip [3] = 0.5*(pointsFlip[1]+pointsFlip[2]);
+					pointsFlip [4] = 0.5*(pointsFlip[0]+pointsFlip[2]);
+
+					solution[tetNum][k].copy_from(solution[flipTetNum][faceNum], pointsOrig, pointsFlip);
 				}
 			}
 			for (int k = 0; k < 4; k++) {
 				if (!cr.isOuter(tet.f(k)))
 					continue;
 
-				vector points [7];
-				double v[10];
-				v[6] = v[7] = v[8] = v[9] = 0;
+				vector points [6];
+				double v[6];
 
 				for (int i = 0; i < 3; i++) {
 					points[i] = tet.f(k).p(i).r();
 				}
 
-				points [3] = 0.5*(points[0]+points[1]);
-				points [4] = 0.5*(points[1]+points[2]);
-				points [5] = 0.5*(points[0]+points[2]);
-				points [6] = tet.center();
-
+				points [5] = 0.5*(points[0]+points[1]);
+				points [3] = 0.5*(points[1]+points[2]);
+				points [4] = 0.5*(points[0]+points[2]);
 				 
 				for(int i = 0; i < 6; i++){
 					const vector &p = points[i];
 
 					traceInfo qInfo = traceTet(tet, omega, p, cr);
-					double solutQ = solution[tetNum][qInfo.num].evaluate(qInfo.point);
+
+					/// >>>>>
+					vector basePoints[3];
+					for (int bk = 0; bk < 3; bk++) {
+						basePoints[bk] = tet.f(qInfo.num).p(bk).r();
+					}
+					/// <<<<<
+					
+					double solutQ = solution[tetNum][qInfo.num].evaluate(qInfo.point, basePoints);
+					//double solutQ = solution[tetNum][qInfo.num].evaluate(qInfo.point, points); // здесь не points в последнем  аргументе
+					// points - вершины грани, из которой мы выпускаем характеристики
+					// а должны стоять вершины грани, на которой характеристика заканчивается, т.е. tet.f(qInfo.num).p(0,1,2).r()
 
 					double delta = norm(p - qInfo.point);
 					double eKappeDelta = exp(-kappa_by_color(tet.color())*delta);
@@ -207,16 +228,21 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 
 				}
 
-				v[3] = correctValue(v[3], v[0], v[1]);
-				v[4] = correctValue(v[4], v[1], v[2]);
-				v[5] = correctValue(v[5], v[0], v[2]);
+				v[5] = correctValue(v[5], v[0], v[1]);
+				v[3] = correctValue(v[3], v[1], v[2]);
+				v[4] = correctValue(v[4], v[0], v[2]);
 
-				solveEq (points, v);
 				solution[tetNum][k].set(v);
 			}
 
 			for (int k = 0; k < 4; k++) {
-				one_dir_sol[tetNum] += 0.25*solution[tetNum][k].evaluate(tet.f(k).center());
+				vector points [3];
+
+				for (int i = 0; i < 3; i++) {
+					points[i] = tet.f(k).p(i).r();
+				}
+
+				one_dir_sol[tetNum] += 0.25*solution[tetNum][k].evaluate(tet.f(k).center(), points);
 			}
 		}
 	}
@@ -227,7 +253,9 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 
 int main() {
 	try {
-		vol_mesh vm("../newMesh3mln.vol");
+		basis::save();
+
+		vol_mesh vm("../mesh.vol");
 		std::cout << "opening mesh" << std::endl;
 
 		mesh m(vm);
