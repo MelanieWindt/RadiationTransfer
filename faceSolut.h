@@ -5,21 +5,65 @@
 
 #include <algorithm>
 
+#define ORDER 2
+#define NFREQ 16
+
 namespace basis {
 
 template<int n>
 double l(double x, double y);
 
-#define SECOND_ORD 1
+#if ORDER == 15
+template<> double l<0>(double x, double y) {
+	if (x+y > 0.5) 
+		return 0;
+	else 
+		return 1 - 2*(x + y);
+}
 
-#if SECOND_ORD
+template<> double l<1>(double x, double y) {
+	if ( x < 0.5)
+		return 0;
+	else 
+		return 2*x - 1;
+}
+
+template<> double l<2>(double x, double y) { return l<1>(y, x); }
+
+template<> double l<3>(double x, double y) {
+	if (x + y < 0.5) 
+		return 0;
+	if (x > 0.5)
+		return 2*y;
+	if (y > 0.5)
+		return 2*x;
+	return 2*x + 2*y - 1;
+}
+
+
+template<> double l<4>(double x, double y) {
+	if (x > 0.5) 
+		return 0;
+	if (x + y < 0.5)
+		return 2*y;
+	if (y > 0.5)
+		return -2*x - 2*y + 2;
+	return -2*x + 1;
+}
+
+template<> double l<5>(double x, double y) { return l<4>(y, x); } 
+#endif
+
+#if ORDER == 2
 template<> double l<0>(double x, double y) { return (x + y - 1) * (2 * x + 2 * y - 1); }
 template<> double l<1>(double x, double y) { return x * (2 * x - 1); }
 template<> double l<2>(double x, double y) { return y * (2 * y - 1); }
 template<> double l<3>(double x, double y) { return 4 * x * y; }
 template<> double l<4>(double x, double y) { return -4 * y * (x + y - 1); }
 template<> double l<5>(double x, double y) { return -4 * x * (x + y - 1); }
-#else
+#endif
+
+#if ORDER == 1
 template<> double l<0>(double x, double y) { return 1 - x - y; }
 template<> double l<1>(double x, double y) { return x; }
 template<> double l<2>(double x, double y) { return y; }
@@ -96,9 +140,9 @@ void save() {
 }
 
 struct faceSolut {
-	double v [6];
+	double v [6][NFREQ];
 
-	double evaluate (const mesh3d::vector &p, const mesh3d::vector points []) const {
+	double evaluate (const mesh3d::vector &p, const mesh3d::vector points [], int ifreq) const {
 		double ATr [2], ATAinv [2][2], detInv, x, y;
 		const mesh3d::vector &p0 = points [0];
 		const mesh3d::vector &p1 = points [1];
@@ -137,29 +181,35 @@ struct faceSolut {
 			__builtin_trap();
 		}
 
-		return 	v[0]*basis::l<0>(x, y) + 
-				v[1]*basis::l<1>(x, y) + 
-				v[2]*basis::l<2>(x, y) + 
-				v[3]*basis::l<3>(x, y) + 
-				v[4]*basis::l<4>(x, y) +
-				v[5]*basis::l<5>(x, y);
+		return 	v[0][ifreq]*basis::l<0>(x, y) + 
+				v[1][ifreq]*basis::l<1>(x, y) + 
+				v[2][ifreq]*basis::l<2>(x, y) + 
+				v[3][ifreq]*basis::l<3>(x, y) + 
+				v[4][ifreq]*basis::l<4>(x, y) +
+				v[5][ifreq]*basis::l<5>(x, y);
 	}
 
 	void setZero () {
 		for (int i = 0; i < 6; i++) {
-			v[i] = 0;
+			for (int j = 0; j < NFREQ; j++) {
+				v[i][j] = 0;
+			}
 		}
 	}
 
-	void set (double w []) {
+	void set (double w [6][NFREQ]) {
 		for (int i = 0; i < 6; i++) {
-			v[i] = w[i]; 
+			for (int j = 0; j < NFREQ; j++) {
+				v[i][j] = w[i][j]; 
+			}
 		}
 	}
 
 	void copy_from (const faceSolut &origSolut, const mesh3d::vector pointsOrig [3], const mesh3d::vector pointsFlip [6]) {
 		for (int i = 0; i < 6; i++) {
-			v[i] = origSolut.evaluate (pointsFlip[i], pointsOrig);
+			for (int j = 0; j < NFREQ; j++) {
+				v[i][j] = origSolut.evaluate (pointsFlip[i], pointsOrig, j);
+			}
 		}	
 	}
 

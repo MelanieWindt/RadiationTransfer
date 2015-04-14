@@ -60,14 +60,15 @@ traceInfo traceTet (const tetrahedron &tet, const vector &omega, const vector &i
 	return traceInfo(num, Qs[num]);
 }
 
-double kappa_by_color (index color) {
+double kappa_by_color (index color, int ifreq) {
 	if (color == 1)
 		return 10;
-	return 0.01;
+	return 0.01/(1 + ifreq);
 }
 
-double Ieq_by_color (index color) {
-	if (color ==1)
+double Ieq_by_color (index color, int ifreq) {
+	(void)ifreq;
+	if (color == 1)
 		return 1;
 	return 0;
 }
@@ -192,7 +193,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 					continue;
 
 				vector points [6];
-				double v[6];
+				double v[6][NFREQ];
 
 				for (int i = 0; i < 3; i++) {
 					points[i] = tet.f(k).p(i).r();
@@ -207,32 +208,33 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 
 					traceInfo qInfo = traceTet(tet, omega, p, cr);
 
-					/// >>>>>
 					vector basePoints[3];
 					for (int bk = 0; bk < 3; bk++) {
 						basePoints[bk] = tet.f(qInfo.num).p(bk).r();
 					}
-					/// <<<<<
 					
-					double solutQ = solution[tetNum][qInfo.num].evaluate(qInfo.point, basePoints);
-					//double solutQ = solution[tetNum][qInfo.num].evaluate(qInfo.point, points); // здесь не points в последнем  аргументе
-					// points - вершины грани, из которой мы выпускаем характеристики
-					// а должны стоять вершины грани, на которой характеристика заканчивается, т.е. tet.f(qInfo.num).p(0,1,2).r()
+					for (int ifreq = 0; ifreq < NFREQ; ifreq++) {
+						double solutQ = solution[tetNum][qInfo.num].evaluate(qInfo.point, basePoints, ifreq);
+						double delta = norm(p - qInfo.point);
+						double eKappeDelta = exp(-kappa_by_color(tet.color(), ifreq)*delta);
+						double Ieq = Ieq_by_color(tet.color(), ifreq);
+						double solutP = solutQ*eKappeDelta + Ieq*(1 - eKappeDelta);
 
-					double delta = norm(p - qInfo.point);
-					double eKappeDelta = exp(-kappa_by_color(tet.color())*delta);
-					double Ieq = Ieq_by_color(tet.color());
-					double solutP = solutQ*eKappeDelta + Ieq*(1 - eKappeDelta);
-
-					v[i] = solutP;
+						v[i][ifreq] = solutP;
+					}
 
 				}
 
-				v[5] = correctValue(v[5], v[0], v[1]);
-				v[3] = correctValue(v[3], v[1], v[2]);
-				v[4] = correctValue(v[4], v[0], v[2]);
+#if ORDER == 2
+				for (int ifreq = 0; ifreq < NFREQ; ifreq ++) {
+					v[5][ifreq] = correctValue(v[5][ifreq], v[0][ifreq], v[1][ifreq]);
+					v[3][ifreq] = correctValue(v[3][ifreq], v[1][ifreq], v[2][ifreq]);
+					v[4][ifreq] = correctValue(v[4][ifreq], v[0][ifreq], v[2][ifreq]);
+				}
+#endif
 
-				solution[tetNum][k].set(v);
+					solution[tetNum][k].set(v);
+	
 			}
 
 			for (int k = 0; k < 4; k++) {
@@ -242,7 +244,9 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 					points[i] = tet.f(k).p(i).r();
 				}
 
-				one_dir_sol[tetNum] += 0.25*solution[tetNum][k].evaluate(tet.f(k).center(), points);
+				for (int ifreq = 0; ifreq < NFREQ; ifreq ++) {
+					one_dir_sol[tetNum] += 0.25*solution[tetNum][k].evaluate(tet.f(k).center(), points, ifreq);
+				}
 			}
 		}
 	}
@@ -254,8 +258,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 int main() {
 	try {
 		basis::save();
-
-		vol_mesh vm("../mesh.vol");
+		vol_mesh vm("../newMesh300k.vol");
 		std::cout << "opening mesh" << std::endl;
 
 		mesh m(vm);
