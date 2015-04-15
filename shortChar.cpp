@@ -2,6 +2,7 @@
 #include "meshProcessor/vtk_stream.h"
 #include "meshProcessor/mesh.h"
 #include <iostream>
+#include <fstream>
 #include <cstdlib>
 
 #include "coloring.h"
@@ -60,71 +61,20 @@ traceInfo traceTet (const tetrahedron &tet, const vector &omega, const vector &i
 	return traceInfo(num, Qs[num]);
 }
 
-double kappa_by_color (index color, int ifreq) {
-	if (color == 1)
+double kappa_by_coord (const mesh3d::vector &p, int ifreq) {
+	if (p.norm() < 0.35)
 		return 10;
-	return 0.01/(1 + ifreq);
+	return 0.5/(1 + ifreq) * (.5 + .25 * std::atan(p.x) / std::atan(1));
 }
 
-double Ieq_by_color (index color, int ifreq) {
-	(void)ifreq;
-	if (color == 1)
-		return 1;
+double Ieq_by_coord (const mesh3d::vector &p, int ifreq) {
+
+	if (p.norm() < 0.35)
+		return 1 + 0.1 * ifreq;
 	return 0;
 }
 
-void solveEq(const vector points[7], double v[10]) {
-	double A [10][10];
-	for (int i = 0; i < 10; i++) {
-		for (int j = 0; j < 10; j++) {
-			A[i][j] = 0;
-		}
-	}
-	for (int i = 0; i < 7; i++) {
-		double x1 = points[i].x;
-		double x2 = points[i].y;
-		double x3 = points[i].z;
-		A[i][0] = 0.5*x1*x1;
-		A[i][1] = 0.5*x2*x2;
-		A[i][2] = 0.5*x3*x3;
-		A[i][3] = x2*x3;
-		A[i][4] = x1*x3;
-		A[i][5] = x2*x1;
-		A[i][6] = x1;
-		A[i][7] = x2;
-		A[i][8] = x3;
-		A[i][9] = 1;
-	}
-
-	A[7][0] = A[8][5] = A[9][4] = points[6].x;
-	A[7][5] = A[8][1] = A[9][3] = points[6].y;
-	A[7][4] = A[8][3] = A[9][2] = points[6].z;
-
-	A[7][6] = A[8][7] = A[9][8] = 1;
-	solve (10, (double *)A, v, v);
-}
-
-double correctValue(double solutP, double I1, double I2) {
-	double min, max;
-	if (I1 > I2) {
-		max = 0.25*(3*I1 + I2);
-		min = 0.25*(3*I2 + I1);
-	}
-	else {
-		max = 0.25*(3*I2 + I1);
-		min = 0.25*(3*I1 + I2);
-	}
-
-	if (solutP < min) 
-		return min;
-	else if (solutP > max)
-		return max;
-	else 
-		return solutP;
-
-}
-
-void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_sol) {
+std::vector<double> one_dir(const mesh &m, const vector &omega, std::vector< std::vector<double> > &one_dir_sol) {
 
 	Timer t;
 
@@ -161,7 +111,7 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 		for(size_t j = 0; j < order[color].size(); j++){
 			int tetNum = order[color][j];
 			const tetrahedron &tet = m.tets(tetNum);
-			one_dir_sol[tetNum] = 0;
+
 			for (int k = 0; k < 4; k++) {
 				if (cr.isOuter(tet.f(k)))
 					continue;
@@ -216,8 +166,8 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 					for (int ifreq = 0; ifreq < NFREQ; ifreq++) {
 						double solutQ = solution[tetNum][qInfo.num].evaluate(qInfo.point, basePoints, ifreq);
 						double delta = norm(p - qInfo.point);
-						double eKappeDelta = exp(-kappa_by_color(tet.color(), ifreq)*delta);
-						double Ieq = Ieq_by_color(tet.color(), ifreq);
+						double eKappeDelta = exp(-kappa_by_coord(tet.center(), ifreq)*delta);
+						double Ieq = Ieq_by_coord(tet.center(), ifreq);
 						double solutP = solutQ*eKappeDelta + Ieq*(1 - eKappeDelta);
 
 						v[i][ifreq] = solutP;
@@ -225,34 +175,50 @@ void one_dir(const mesh &m, const vector &omega, std::vector<double> &one_dir_so
 
 				}
 
-#if ORDER == 2
-				for (int ifreq = 0; ifreq < NFREQ; ifreq ++) {
-					v[5][ifreq] = correctValue(v[5][ifreq], v[0][ifreq], v[1][ifreq]);
-					v[3][ifreq] = correctValue(v[3][ifreq], v[1][ifreq], v[2][ifreq]);
-					v[4][ifreq] = correctValue(v[4][ifreq], v[0][ifreq], v[2][ifreq]);
-				}
-#endif
-
-					solution[tetNum][k].set(v);
+				solution[tetNum][k].set(v);
 	
 			}
 
 			for (int k = 0; k < 4; k++) {
-				vector points [3];
 
 				for (int i = 0; i < 3; i++) {
-					points[i] = tet.f(k).p(i).r();
-				}
-
-				for (int ifreq = 0; ifreq < NFREQ; ifreq ++) {
-					one_dir_sol[tetNum] += 0.25*solution[tetNum][k].evaluate(tet.f(k).center(), points, ifreq);
+					index v = tet.f(k).p(i).idx();
+					for (int ifreq = 0; ifreq < NFREQ; ifreq++) {
+						one_dir_sol[v][ifreq] = solution[tetNum][k].v[i][ifreq];
+					}
 				}
 			}
 		}
 	}
+
+	std::vector<double> integral(NFREQ);
+
+	for (size_t i = 0; i < m.tets().size(); i++) {
+		const tetrahedron &tet = m.tets(i);
+		for (int j = 0; j < 4; j++) {
+			const face &f = tet.f(j);
+			if (!f.flip().is_border())
+				continue;
+			vector norm = f.normal();
+			double normOmega = norm.dot(omega);
+			if (normOmega > 0)
+				continue;
+			vector points [3];
+ 
+			for (int k = 0; k < 3; k++) {
+				points[k] = f.p(k).r();
+			}
+			for (int ifreq = 0; ifreq < NFREQ; ifreq++) {
+				integral[ifreq] += -f.surface()*normOmega*solution[i][j].evaluate(f.center(), points, ifreq);
+			}
+		}
+	}
+
 	std::cout << "one_dir function, cycle by colors " << b.stopAndGetElapsedTime () << std::endl;
 	std::cout << "steps = " << maxColor + 1 << std::endl;
 	std::cout << "one_dir function " << t.stopAndGetElapsedTime () << std::endl;
+
+	return integral;
 }
 
 int main() {
@@ -267,26 +233,58 @@ int main() {
 		
 		LebedevQuad quad(5);
 		std::cout << "Using " << quad.order << " directions" << std::endl;
-		std::vector<double> U(m.tets().size(), 0);
-		std::vector<double> I(m.tets().size());
+		std::vector< std::vector <double> > U(m.vertices().size(), std::vector<double>(NFREQ, 0));
+		std::vector< std::vector <double> > I(m.vertices().size(), std::vector<double>(NFREQ));
+
+		std::vector <std::vector<double> > integral (quad.order);
 
 		for (int s = 0; s < quad.order; s++) {
-			one_dir(m, vector(quad.x[s], quad.y[s], quad.z[s]), I);
-			for (size_t i = 0; i < m.tets().size(); i++)
-				U[i] += quad.w[s] * I[i];
+			integral [s] = one_dir(m, vector(quad.x[s], quad.y[s], quad.z[s]), I);
+			for (size_t i = 0; i < I.size(); i++){
+				for (int ifreq = 0; ifreq < NFREQ; ifreq ++) {
+					U[i][ifreq] += quad.w[s] * I[i][ifreq];
+				}
+			}
 			if (s == 0) {
 				vtk_stream vtk("onedir.vtk");
 				vtk.write_header(m, "I_1");
-				vtk.append_cell_data(I.data(), "I");
+				for (int ifreq = 0; ifreq < NFREQ; ifreq ++) {
+					std::vector<double> If(I.size());
+					for (size_t i = 0; i < If.size(); i++)
+						If[i] = I[i][ifreq];
+					char name[10];
+					sprintf(name, "I%d", ifreq);
+					vtk.append_point_data(If.data(), name);
+				}
 				vtk.close(); 
 			}
 		}
 	
 		vtk_stream vtk("mesh.vtk");
 		vtk.write_header(m, "U");
-		vtk.append_cell_data(U.data(), "U");
-		vtk.close(); 
+		for (int ifreq = 0; ifreq < NFREQ; ifreq ++) {
+			std::vector<double> Uf(U.size());
+				for (size_t i = 0; i < Uf.size(); i++)
+					Uf[i] = U[i][ifreq];
+				char name[10];
+				sprintf(name, "U%d", ifreq);
+				vtk.append_point_data(Uf.data(), name);
+		}
+
+		vtk.close();
+
+		std::ofstream myfile;
+	  	myfile.open ("1.txt");
+	  	for (int i = 0; i < quad.order; i++) {
+	  		for (int j = 0; j < NFREQ; j++) {
+	  			myfile << integral[i][j] << " ";
+	  		}
+	  		myfile << std::endl;
+	  	}
+	  	myfile.close();
 	}
+
+
 	catch (std::exception &e) {
 		std::cerr << "Exception occured: " << e.what() << std::endl;
 	} 

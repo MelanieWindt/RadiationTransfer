@@ -6,7 +6,27 @@
 #include <algorithm>
 
 #define ORDER 2
-#define NFREQ 16
+#define NFREQ 4
+
+double correctValue(double solutP, double I1, double I2) {
+	double min, max;
+	if (I1 > I2) {
+		max = 0.25*(3*I1 + I2);
+		min = 0.25*(3*I2 + I1);
+	}
+	else {
+		max = 0.25*(3*I2 + I1);
+		min = 0.25*(3*I1 + I2);
+	}
+
+	if (solutP < min) 
+		return min;
+	else if (solutP > max)
+		return max;
+	else 
+		return solutP;
+
+}
 
 namespace basis {
 
@@ -203,6 +223,14 @@ struct faceSolut {
 				v[i][j] = w[i][j]; 
 			}
 		}
+
+#if ORDER == 2
+		for (int ifreq = 0; ifreq < NFREQ; ifreq ++) {
+			v[5][ifreq] = correctValue(v[5][ifreq], v[0][ifreq], v[1][ifreq]);
+			v[3][ifreq] = correctValue(v[3][ifreq], v[1][ifreq], v[2][ifreq]);
+			v[4][ifreq] = correctValue(v[4][ifreq], v[0][ifreq], v[2][ifreq]);
+		}
+#endif
 	}
 
 	void copy_from (const faceSolut &origSolut, const mesh3d::vector pointsOrig [3], const mesh3d::vector pointsFlip [6]) {
